@@ -80,3 +80,7 @@ We have three folders
 `Scripts` 
 
 we have scripting files and notebooks that call using PIQL and then run ploting tesing
+
+# To Do
+
+- Treat paths appropriately or aggressively.

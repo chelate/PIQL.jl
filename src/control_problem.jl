@@ -20,6 +20,9 @@ struct StateAction{S,A} # static and constructed on forward pass
     # atomic unit of data for all reinforcement learning
     state::S
     action::A
+    f::Float64
+    u::Float64
+    cost::Float64
     β::Float64 # the beta under which the temperature is allowed to fluxuate
     E_actor::Float64
     E_critic::Float64
@@ -34,10 +37,18 @@ function intial_state_action(ctrl::ControlProblem, actor; critic_samples = 1)
     # begin a trajectory from the initial_state distributon
     # return a StateAction object
     state = ctrl.initial_state() # new_state
-    (action, E_actor) = choose_action(state, ctrl, actor) # new_action
+    return initial_action(state, ctrl, actor; critic_samples)
+end
+
+function intial_action(state, ctrl::ControlProblem, actor; critic_samples = 1)
+    #function intial_state_action(ctrl, actor; critic_samples = 1)
+    # begin a trajectory from the initial_state distributon
+    # return a StateAction object
+    (action, E_actor) = choose_action(state, ctrl, actor; critic_samples) # new_action
     E_critic = 0.0 # there was no prior state-action pair to be used here
     return StateAction(state, action, actor.β, E_actor, E_critic)
 end
+    
 
 
 
@@ -69,8 +80,11 @@ function choose_action(state, ctrl, actor)
     priors = priors ./ sum(priors)
     energies = [actor(state,a) for a in ctrl.action_space]
     emin=minimum(energies)
+    z = sum(priors .* exp.(- actor.β .* (energies .- emin)))
+    f = emin - log(z)/actor.β 
+    u = emin  + sum(priors .* exp.(- actor.β .* (energies .- emin) .* (energies .- emin)))/z
     ii = sample(weights(priors .* exp.(- actor.β .* (energies .- emin))))
-    return (ctrl.action_space[ii], energies[ii])
+    return (ctrl.action_space[ii], energies[ii], f, u)
 end
 
 function energy_critic(state, action, ctrl, actor; critic_samples = 1)

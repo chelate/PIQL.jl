@@ -3,6 +3,9 @@ uuid = "4ca79624-ad72-4ef4-9edf-da6916730ece"
 authors = ["chelate <42802644+chelate@users.noreply.github.com> and contributors"]
 version = "0.1.0"
 
+[deps]
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+
 [compat]
 julia = "1.7"
 
