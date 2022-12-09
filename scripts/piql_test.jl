@@ -1,3 +1,3 @@
-using Pkg, Revise
+using Revise
 using PIQL
 

@@ -1,6 +1,6 @@
 
 
-function performance_estimate(ctrl::ControlProblem, actor; n_simulations = 100, state = ctrl.initial_state())
+function performance_estimate(ctrl, actor; n_simulations = 100, state = ctrl.initial_state())
     control_cost = 0.0
     state_cost = 0.0
     sa = initial_action(state, ctrl, actor)

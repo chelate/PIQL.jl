@@ -32,6 +32,9 @@ struct StateAction{S,A} # static and constructed on forward pass
     β::Float64 # the beta under which the temperature is allowed to fluctuate
     E_actor::Float64
     E_critic::Float64
+    cost::Float64
+    f::Float64
+    u::Float64
 end
 ```
 Via back propagation, this becomes our fundamental unit for training

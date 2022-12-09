@@ -23,7 +23,7 @@ mutable struct PiqlParticle{S,A}
     function PiqlParticle(stateaction::StateAction{S,A}) where {S,A} 
         worldline = [stateaction]
         memory = EnergyEstimate{S,A}[]
-        return new(worldline, memory, 1)
+        return new{S,A}(worldline, memory, 1)
     end
 end
 
