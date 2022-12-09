@@ -86,4 +86,10 @@ we have scripting files and notebooks that call using PIQL and then run ploting 
 
 # To Do
 
-- Treat paths appropriately or aggressively.
+- Treat paths memory-aggressively.
+- prepare for GZL
+- get maze 
+
+paper:
+- update references
+- write up q-learning
