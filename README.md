@@ -37,7 +37,9 @@ struct StateAction{S,A} # static and constructed on forward pass
     u::Float64
 end
 ```
+
 Via back propagation, this becomes our fundamental unit for training
+
 ```julia
 struct EnergyEstimate{S,A}
     state::S

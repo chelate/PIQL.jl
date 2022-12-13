@@ -1,105 +1,79 @@
 #include("agent.jl")
+export Gridworld, make_ctrl, make_gridworld
+
+"""
+Just a refernce struct 
+struct ControlProblem{A, U, P, C, T, W}
+    action_space::Vector{A} # something that we can iterate over
+    action_prior::U # π(s,a) -> Float64 exactly like energy
+    propagator::P # p(x0, a) -> x1 ("random" state)
+    cost_function::C # c(x0, a, x1) -> Cost ::Float64
+    terminal_condition::T # T(x) -> bool
+    initial_state::W # W() -> x0 generates inital states of interest
+    γ::Float64 # positive number discount over time
+end
+"""
+
+
+"""
+Actions are indexed by natural numbers
+"""
+step_choices(;dim = 2) = collect(0:2*dim-1)
+function step(a; dim = 2)
+    [(1-2*mod(a,2))*(div(a,2) == ii) for ii in 0:dim-1]
+end
+
+
+function take_step(x0, a; dim = 2, walls = Bool[])
+    x1 = x0 .+ step(a;dim)
+    return ifelse(walls[x1...], x0, x0 .+ step(a;dim))
+end
+
+terminal_condition(x; dim = 2, term = ones(dim)) = (x .== term) 
+
 
 struct Gridworld
-    grid::Array{Int64,2}
-    actions::Array{Int64,1}
-    terminal_cond::Array{Bool,2}
+    walls::Array{Bool}
+    goal::Vector{Int}
 end
 
-
-
-function initilaize_gridwold(prams::Tuple)
-    initilaize_gridwold(prams[1],prams[2],prams[3],prams[4])
-
-end
-
-function initilaize_gridwold(
-    size,
-    walls,
-    reward_pos::Tuple{Int64,Int64},
-    rewards::Array{Int64,1},
-)
-    grid = convert.(Int64, ones(Int64, size) .* rewards[1])
-    terminal_cond=convert.(Bool,zeros(Int8, size))
-    #initilize border
-    grid[1, :] .= 0
-    grid[size[1], :] .= 0
-    grid[:, 1] .= 0
-    grid[:, size[2]] .= 0
-
-    #initilize walls
-    for wall in walls
-        pos = give_grid_posistion(grid, wall)
-        grid[pos] = 0
-    end
-
-    #set reward
-    grid[give_grid_posistion(grid, reward_pos)] = rewards[2]
-    terminal_cond[give_grid_posistion(grid, reward_pos)] = true
-
-    #initilize possible actions (move  [up,right, down, left])
-    actions = [-1, size[1], 1, -size[1]]
-
-    return Gridworld(grid, actions,terminal_cond)
-end
-
-
-function build_pickle_grid(size, holes, thick, basevalue)
-    pickle = convert.(Int64, ones(Int64, size) .* basevalue)
-    pickle[1, :] .= 0
-    pickle[size[1], :] .= 0
-    pickle[:, 1] .= 0
-    pickle[:, size[2]] .= 0
-
-    for xx = 1:size[1]
-        for yy = 1:size[1]
-            if (yy < xx - thick)
-                pickle[xx, yy] = 0
-            elseif (yy > xx + thick)
-                pickle[xx, yy] = 0
-            end
+function make_walls(size; density = 0.1)
+    walls = falses((size .+ 2)...)
+    walls[begin,:] .= true
+    walls[end,:] .= true
+    walls[:,begin] .= true
+    walls[:,end] .= true
+    for ii in eachindex(walls)
+        if rand() < density
+            walls[ii] = true # put down random barriers
         end
     end
+    return walls
+end
 
-    for hole = 1:holes
-        point = start_random_actor(pickle, basevalue)
-        pickle[point] = 0
+function draw_not_wall(walls)
+    while true
+        ii = rand(LinearIndices(walls))
+        if !walls[ii]
+            return collect(Tuple(CartesianIndices(walls)[ii]))
+        end
     end
-    return pickle
-
 end
 
-
-function initilaize_gridwold_pickle(
-    size,
-    holes,
-    thick,
-    reward_pos::Tuple{Int64,Int64},
-    rewards::Array{Int64,1},
-)
-    grid = build_pickle_grid(size, holes, thick, rewards[1])
-
-    #set reward
-    grid[give_grid_posistion(grid, reward_pos)] = rewards[2]
-
-    #initilize possible actions (move  [up,right, down, left])
-    actions = [-1, size[1], 1, -size[1]]
-
-    return Gridworld(grid, actions)
+function make_gridworld(size; density = 0.1)
+    walls = make_walls(size; density)
+    goal = draw_not_wall(walls)
+    return Gridworld(walls,goal)
 end
 
-
-
-#### Initilazation of some paractical environt functions
-
-function give_grid_posistion(grid, (x, y))
-    return length(grid[:, 1]) * (x - 1) + y
-end
-
-function give_cartisian_posistion(grid, pos)
-    l1 = length(grid[:, 1])
-    y = (pos - 1) % l1
-    y += 1
-    x = floor(Int, (pos - y) / l1) + 1
-    return x, y
+function make_ctrl(gw::Gridworld; step_cost = 1, reward = -5)
+    dim = ndims(gw.walls)
+    ControlProblem(
+        step_choices(;dim),
+        (s,a)->1.0,
+        (s,a) -> take_step(s,a; dim, gw.walls),
+        (s0,a,s1) -> ifelse(s1 == gw.goal, reward, step_cost),
+        s -> s == gw.goal ,
+        () -> draw_not_wall(gw.walls),
+        .99)
 end

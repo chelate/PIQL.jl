@@ -24,26 +24,26 @@ struct StateAction{S,A} # static and constructed on forward pass
     β::Float64 # the beta under which the temperature is allowed to fluxuate
     E_actor::Float64
     E_critic::Float64
-    cost::Float64
-    f::Float64
-    u::Float64
+    cost::Float64 # actually incurred cost
+    f::Float64 # free energy of current action
+    u::Float64 # average energy of current action
 end
 
 
 """
 Start off a trajectory with a new state action pair
 """
-function intial_state_action(ctrl::ControlProblem, actor; critic_samples = 1)
+function intial_state_action(ctrl::ControlProblem, actor)
 #function intial_state_action(ctrl, actor; critic_samples = 1)
     # begin a trajectory from the initial_state distributon
     # return a StateAction object
     state = ctrl.initial_state() # new_state
-    return initial_action(state, ctrl, actor; critic_samples)
+    return initial_action(state, ctrl, actor)
 end
 
 
-function intial_action(state, ctrl::ControlProblem, actor; critic_samples = 1)
-    (action, E_actor, f, u) = choose_action(state, ctrl, actor; critic_samples) # new_action
+function initial_action(state, ctrl::ControlProblem, actor)
+    (action, E_actor, f, u) = choose_action(state, ctrl, actor) # new_action
     cost = 0.0
     E_critic = 0.0 # there was no prior state-action pair to be used here
     return StateAction(state, action, actor.β, E_actor, E_critic, cost, f, u)
@@ -56,12 +56,12 @@ function new_state_action(sa::StateAction{S,A}, ctrl::ControlProblem, actor; cri
     (action, E_actor, f, u) = ifelse(ctrl.terminal_condition(state), (sa.action, 0.0, 0.0, 0.0), 
         choose_action(state, ctrl, actor))
     if isnan(E_actor)
-        println("the E_actor is the first thing that goes bad")
+        error("the E_actor is the first thing that goes bad")
     end
     E_critic = energy_critic(sa.state, sa.action, ctrl, actor; critic_samples)
     cost = ctrl.cost_function(sa.state,sa.action,state)
     if isnan(E_critic)
-        println("the E_critic is the first thing that goes bad")
+        error("the E_critic is the first thing that goes bad")
     end
     return StateAction{S,A}(state, action, actor.β, E_actor, E_critic, cost, f, u) # Let the compiler know that it is type invariant
 end
