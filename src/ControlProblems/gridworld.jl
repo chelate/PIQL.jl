@@ -1,5 +1,5 @@
 #include("agent.jl")
-export Gridworld, make_ctrl, make_gridworld
+export Gridworld, make_ctrl, make_gridworld, state_iterator
 
 """
 Just a refernce struct 
@@ -66,7 +66,7 @@ function make_gridworld(size; density = 0.1)
     return Gridworld(walls,goal)
 end
 
-function make_ctrl(gw::Gridworld; step_cost = 1, reward = -5)
+function make_ctrl(gw::Gridworld; step_cost = 1, reward = -5, γ = 0.99)
     dim = ndims(gw.walls)
     ControlProblem(
         step_choices(;dim),
@@ -75,5 +75,8 @@ function make_ctrl(gw::Gridworld; step_cost = 1, reward = -5)
         (s0,a,s1) -> ifelse(s1 == gw.goal, reward, step_cost),
         s -> s == gw.goal ,
         () -> draw_not_wall(gw.walls),
-        .99)
+        γ)
 end
+
+state_iterator(gw::Gridworld) = filter(ii -> !gw.walls[ii],
+            CartesianIndices(gw.walls))

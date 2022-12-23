@@ -61,10 +61,11 @@ end
 
  Actors are trained via a dispatched function
 ```julia
-function train!(a::TabularActor, ee::EnergyEstimate)
+function train!(a::TabularActor, memory)
     ...
 end
 ```
+This can be destructive or not.
 
 
 

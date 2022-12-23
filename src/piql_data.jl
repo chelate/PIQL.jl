@@ -10,9 +10,9 @@ struct EnergyEstimate{S,A}
     logz::Float64 # previous log z
 end 
 
-function energy_estimate(sa, logz)
-    xi = sa.E_critic - logz / sa.β
-    ee = EnergyEstimate(sa.state, sa.action, sa.β, xi, logz)
+function energy_estimate(sa, logz, ctrl)
+    xi = sa.E_critic - log1p(ctrl.γ * expm1(logz)) / sa.β
+    return EnergyEstimate(sa.state, sa.action, sa.β, xi, logz)
 end
 
 
@@ -20,21 +20,24 @@ mutable struct PiqlParticle{S,A}
     worldline::Vector{StateAction{S,A}} # currently evolving state buffer
     memory::Vector{EnergyEstimate{S,A}} # list of actively evolving nodes
     time::Int # time since worline began (not time in state) for iteration purposes
-    function PiqlParticle(stateaction::StateAction{S,A}) where {S,A} 
+    depth::Int # the target depth of PIQL back propagation for assessing bias/variance tradeoff
+    function PiqlParticle(stateaction::StateAction{S,A}; depth = 1) where {S,A} 
         worldline = [stateaction]
         memory = EnergyEstimate{S,A}[]
-        return new{S,A}(worldline, memory, 1)
+        return new{S,A}(worldline, memory, 1, depth)
     end
 end
 
-function initial_piql(ctrl::ControlProblem, actor)
+function initial_piql(ctrl::ControlProblem, actor; depth = 1)
     sa = intial_state_action(ctrl, actor)
-    return PiqlParticle(sa)
+    # doesn't yet have a valid critic energy
+    return PiqlParticle(sa; depth)
 end
 
 function run_piql!(piql, ctrl, actor)
     sa = piql.worldline[piql.time]
-    terminate_early = rand() > ctrl.γ
+    terminate_early = (piql.time > piql.depth)
+    # for depth = 1, you must still go at least one step,
     if ctrl.terminal_condition(sa.state)
         backpropagate_weights!(piql, ctrl)
         piql.worldline[1] = intial_state_action(ctrl, actor)
@@ -59,15 +62,26 @@ function backpropagate_weights!(piql, ctrl)
     logz = 0.0 # starting z
     while piql.time > 1
         sa = piql.worldline[piql.time]
-        ee = energy_estimate(sa, logz)
+        ee = energy_estimate(sa, logz, ctrl) # use the last logz
         push!(piql.memory, ee)
         piql.time -= 1
         sa = piql.worldline[piql.time]
-        logz = sa.β*(sa.E_actor - ee.xi)
+        logz = sa.β*(sa.E_actor - ee.xi) # finish the recurrence relation
     end
     if piql.time != 1
         error("didn't make it to the end")
     end
+end
+
+function random_piql(ctrl, actor; depth = 1)
+    piql = initial_piql(ctrl::ControlProblem, actor; depth)
+    while true 
+        terminated = run_piql!(piql, ctrl, actor)
+        if terminated 
+            break
+        end
+    end
+    return piql
 end
 
 function training_epoch!(piql, ctrl, actor)

@@ -36,7 +36,7 @@ function example_init_ta(example_key::SA, update, mapping, action_space, β) whe
         update, mapping, action_space, β)
 end
 
-function init_tabular_actor_piql(ctrl, β; 
+function init_tabular_actor_piql(ctrl; β = 1.0,
     mapping = (state,action) -> (state,action), update = update_function_piql(;burnin = 1, p = 2/3, β))
     example = mapping(ctrl.initial_state(), first(ctrl.action_space))
         # get type information about mapping result
