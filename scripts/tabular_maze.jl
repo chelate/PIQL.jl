@@ -7,15 +7,24 @@ gw = make_gridworld([20,20]; density = 0.15);
 ctrl = make_ctrl(gw);
 states = state_iterator(gw)
 actor0 = get_ideal_actor(ctrl, states)
-actor1 = jitter_actor(actor0, 1.0)
+actor1 = jitter_actor(actor0, 0.2)
+piql = PIQL.random_piql(ctrl, actor1; depth = 3) # depth controls how long the piql is
 
 function energy_est_truth(actor0, actor1; depth = 1)
     piql = PIQL.random_piql(ctrl, actor1; depth)
+    while isempty(piql.memory)
+        piql = PIQL.random_piql(ctrl, actor1; depth)
+    end
     ee = last(piql.memory)
-    (actor0(ee.state, ee.action), ee.xi)
+    current_e = actor1(ee.state, ee.action)
+    (actor0(ee.state, ee.action) , ee.xi, current_e)
+    # truth, est, current
 end
 
-energy_est_truth(actor0, actor1; depth = 1)
+dvec = [mean(
+    (x-> (x[2]- x[1]))(energy_est_truth(actor0, actor1; depth = d)) for ii in 1:10000) for d = 1:10]
+
+
 
 """
 For plotting the result, show the free energy as a function of state

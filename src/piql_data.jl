@@ -10,12 +10,26 @@ struct EnergyEstimate{S,A}
     logz::Float64 # previous log z
 end 
 
-function energy_estimate(sa, logz, ctrl)
-    xi = sa.E_critic - log1p(ctrl.γ * expm1(logz)) / sa.β
-    return EnergyEstimate(sa.state, sa.action, sa.β, xi, logz)
+"""
+for reference: current stateaction definition
+struct StateAction{S,A} # static and constructed on forward pass
+    state::S
+    action::A
+    β::Float64 # the beta under which the state was generated
+    E_actor::Float64 # the actor energy associated with the current state
+    E_critic::Float64 # the critic energy associated with the previous state
+    
+    # 
+    # diagnostics
+    #
+
+    cost::Float64 # actually incurred cost
+    f::Float64 # free energy of current action
+    u::Float64 # average energy of current action
 end
 
-
+currently assumption that energy is constant over run.
+"""
 mutable struct PiqlParticle{S,A}
     worldline::Vector{StateAction{S,A}} # currently evolving state buffer
     memory::Vector{EnergyEstimate{S,A}} # list of actively evolving nodes
@@ -57,16 +71,22 @@ function run_piql!(piql, ctrl, actor)
     return terminated
 end
 
+function energy_estimate(sa0, sa1, logz, ctrl)
+    xi = sa1.E_critic - log1p(ctrl.γ * expm1(logz)) / sa1.β # not quite sure which β to use
+    new_logz = sa0.β*(sa0.E_actor - xi) # finish the recurrence relation
+    return (EnergyEstimate(sa0.state, sa0.action, sa1.β, xi, logz), new_logz)
+end
+
 function backpropagate_weights!(piql, ctrl)
     # may use ctrl later to update things with changing $β$.
     logz = 0.0 # starting z
     while piql.time > 1
-        sa = piql.worldline[piql.time]
-        ee = energy_estimate(sa, logz, ctrl) # use the last logz
-        push!(piql.memory, ee)
+        sa1 = piql.worldline[piql.time]
         piql.time -= 1
-        sa = piql.worldline[piql.time]
-        logz = sa.β*(sa.E_actor - ee.xi) # finish the recurrence relation
+        sa0 = piql.worldline[piql.time] # previous state
+        (ee, logz) = energy_estimate(sa0, sa1, logz, ctrl) # use the last logz
+        # ee is a function of sa0 state acton pair
+        push!(piql.memory, ee)
     end
     if piql.time != 1
         error("didn't make it to the end")
