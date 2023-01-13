@@ -60,9 +60,30 @@ function draw_not_wall(walls)
     end
 end
 
+function get_reachable(walls, goal)
+    reachable_set = Set([goal])
+    boundary = Set([goal])
+    D = ndims(walls)
+    while !isempty(boundary)
+        union!(reachable_set, boundary)
+        boundary = reduce(union,
+            Set(ii .+ s
+                for s in step.(step_choices(;dim = D);dim = D) if 
+                    !in(ii .+ s, reachable_set) & !walls[(ii .+ s)...] )
+            for ii in boundary)
+    end
+    return reachable_set
+end
+
 function make_gridworld(size; density = 0.1)
     walls = make_walls(size; density)
     goal = draw_not_wall(walls)
+    reachable_set = get_reachable(walls, goal)
+    for ii in CartesianIndices(walls)
+        if !in(collect(Tuple(ii)),reachable_set)
+             walls[ii] = true
+         end
+    end
     return Gridworld(walls,goal)
 end
 

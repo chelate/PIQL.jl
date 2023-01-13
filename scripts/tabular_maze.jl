@@ -3,7 +3,7 @@ using PIQL
 using StatsBase
 
 
-gw = make_gridworld([20,20]; density = 0.15);
+gw = make_gridworld([20,20]; density = 0.30);
 ctrl = make_ctrl(gw);
 states = state_iterator(gw)
 actor0 = get_ideal_actor(ctrl, states)
