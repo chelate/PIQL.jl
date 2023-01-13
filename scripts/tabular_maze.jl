@@ -7,7 +7,9 @@ gw = make_gridworld([20,20]; density = 0.15);
 ctrl = make_ctrl(gw);
 states = state_iterator(gw)
 actor0 = get_ideal_actor(ctrl, states)
-actor1 = jitter_actor(actor0, 0.2)
+actor_jittered = jitter_actor(actor0, 0.2)
+actor_heated = get_ideal_actor(ctrl, states; β = 2)
+actor_heated.β = 1.0
 piql = PIQL.random_piql(ctrl, actor1; depth = 3) # depth controls how long the piql is
 
 function energy_est_truth(actor0, actor1; depth = 1)
@@ -22,7 +24,7 @@ function energy_est_truth(actor0, actor1; depth = 1)
 end
 
 dvec = [mean(
-    (x-> (x[2]- x[1]))(energy_est_truth(actor0, actor1; depth = d)) for ii in 1:10000) for d = 1:10]
+    (x-> (x[2]- x[1]))(energy_est_truth(actor0, actor_heated; depth = d)) for ii in 1:1000) for d = 1:30]
 
 
 
@@ -55,6 +57,7 @@ for ii in 1:100
 end
 
 using UnicodePlots
+lineplot(dvec)
 a = zeros(size(gw.walls))
 a[gw.goal...] += 2
 a .+= gw.walls
