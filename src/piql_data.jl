@@ -42,8 +42,9 @@ mutable struct PiqlParticle{S,A}
     end
 end
 
-function initial_piql(ctrl::ControlProblem, actor; depth = 1)
-    sa = intial_state_action(ctrl, actor)
+function initial_piql(ctrl::ControlProblem, actor; 
+    depth = 1, 
+    sa = intial_state_action(ctrl, actor))
     # doesn't yet have a valid critic energy
     return PiqlParticle(sa; depth)
 end
@@ -93,8 +94,9 @@ function backpropagate_weights!(piql, ctrl)
     end
 end
 
-function random_piql(ctrl, actor; depth = 1)
-    piql = initial_piql(ctrl::ControlProblem, actor; depth)
+function random_piql(ctrl, actor; depth = 1, 
+    sa = intial_state_action(ctrl, actor))
+    piql = initial_piql(ctrl::ControlProblem, actor; depth, sa)
     while true 
         terminated = run_piql!(piql, ctrl, actor)
         if terminated 
