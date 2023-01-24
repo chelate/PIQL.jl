@@ -55,7 +55,7 @@ function run_piql!(piql, ctrl, actor)
     # for depth = 1, you must still go at least one step,
     if ctrl.terminal_condition(sa.state)
         backpropagate_weights!(piql, ctrl)
-        piql.worldline[1] = intial_state_action(ctrl, actor)
+        piql.worldline[1] = initial_state_action(ctrl, actor)
         terminated = true
     elseif terminate_early
         backpropagate_weights!(piql, ctrl)
@@ -95,7 +95,7 @@ function backpropagate_weights!(piql, ctrl)
 end
 
 function random_piql(ctrl, actor; depth = 1, 
-    sa = intial_state_action(ctrl, actor))
+    sa = initial_state_action(ctrl, actor))
     piql = initial_piql(ctrl::ControlProblem, actor; depth, sa)
     while true 
         terminated = run_piql!(piql, ctrl, actor)

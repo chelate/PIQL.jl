@@ -1,5 +1,5 @@
 
-export ControlProblem, StateAction, intial_state_action, new_state_action
+export ControlProblem, StateAction, initial_state_action, new_state_action
 using Statistics
 
 """
@@ -33,7 +33,7 @@ end
 """
 Start off a trajectory with a new state action pair
 """
-function intial_state_action(ctrl::ControlProblem, actor)
+function initial_state_action(ctrl::ControlProblem, actor)
 #function intial_state_action(ctrl, actor; critic_samples = 1)
     # begin a trajectory from the initial_state distributon
     # return a StateAction object
@@ -73,11 +73,12 @@ function choose_action(state, ctrl, actor)
     priors = priors ./ sum(priors)
     energies = [actor(state,a) for a in ctrl.action_space]
     emin=minimum(energies)
-    z = sum(priors .* exp.(- actor.β .* (energies .- emin)))
-    f = emin - log(z)/actor.β 
-    u = emin  + sum(priors .* exp.(- actor.β .* (energies .- emin) .* (energies .- emin)))/z
-    ii = sample(weights(priors .* exp.(- actor.β .* (energies .- emin))))
-    return (ctrl.action_space[ii], energies[ii], f, u)
+    energies .-= emin
+    z = sum(priors .* exp.(- actor.β .* energies))
+    f = - log(z)/actor.β 
+    u = sum(priors .* exp.(- actor.β .* energies) .* energies) / z
+    ii = sample( weights(priors .* exp.(- actor.β .* (energies))))
+    return (ctrl.action_space[ii], energies[ii], f + emin, u + emin)
 end
 
 function energy_critic(state, action, ctrl, actor; critic_samples = 1)
