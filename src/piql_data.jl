@@ -29,6 +29,7 @@ struct StateAction{S,A} # static and constructed on forward pass
 end
 
 currently assumption that energy is constant over run.
+restarting PIQL hasn't been programmed in yet.
 """
 mutable struct PiqlParticle{S,A}
     worldline::Vector{StateAction{S,A}} # currently evolving state buffer
@@ -55,11 +56,12 @@ function run_piql!(piql, ctrl, actor)
     # for depth = 1, you must still go at least one step,
     if ctrl.terminal_condition(sa.state)
         backpropagate_weights!(piql, ctrl)
-        piql.worldline[1] = initial_state_action(ctrl, actor)
+        # piql.worldline[1] = initial_state_action(ctrl, actor)
+        # if we restart piql, we need to y decide how that will work
         terminated = true
     elseif terminate_early
         backpropagate_weights!(piql, ctrl)
-        piql.worldline[1] = sa # restart piql from last position
+        # piql.worldline[1] = sa # restart piql from last position
         terminated = true
     else 
         piql.time += 1
