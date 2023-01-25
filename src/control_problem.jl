@@ -72,13 +72,13 @@ function choose_action(state, ctrl, actor)
     priors = [ctrl.action_prior(state,a) for a in ctrl.action_space]
     priors = priors ./ sum(priors)
     energies = [actor(state,a) for a in ctrl.action_space]
-    emin=minimum(energies)
+    emin = minimum(energies)
     energies .-= emin
     z = sum(priors .* exp.(- actor.β .* energies))
-    f = - log(z)/actor.β 
+    f = - log(z) / actor.β 
     u = sum(priors .* exp.(- actor.β .* energies) .* energies) / z
-    ii = sample( weights(priors .* exp.(- actor.β .* (energies))))
-    return (ctrl.action_space[ii], energies[ii], f + emin, u + emin)
+    ii = sample( weights(priors .* exp.(- actor.β .* energies)))
+    return (ctrl.action_space[ii], energies[ii] + emin, f + emin, u + emin)
 end
 
 function energy_critic(state, action, ctrl, actor; critic_samples = 1)

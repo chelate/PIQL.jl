@@ -21,4 +21,6 @@ end
 
 """
 S = -<F-E> = U - F
+
+but KL divergence is F - U.
 """
