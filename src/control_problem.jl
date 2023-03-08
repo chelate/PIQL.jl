@@ -13,7 +13,7 @@ struct ControlProblem{A, U, P, C, T, W}
     cost_function::C # c(x0, a, x1) -> Cost ::Float64
     terminal_condition::T # T(x) -> bool
     initial_state::W # W() -> x0 generates inital states of interest
-    γ::Float64 # positive number discount over time
+    γ::Float64 # positive number less than one discount over time
 end
 
 struct StateAction{S,A} # static and constructed on forward pass
@@ -24,7 +24,7 @@ struct StateAction{S,A} # static and constructed on forward pass
     β::Float64 # the beta under which the temperature is allowed to fluxuate
     E_actor::Float64
     E_critic::Float64
-    cost::Float64 # actually incurred cost
+    cost::Float64 # actually incurred cost entering the state
     f::Float64 # free energy of current action
     u::Float64 # average energy of current action
 end
@@ -53,7 +53,8 @@ end
 function new_state_action(sa::StateAction{S,A}, ctrl::ControlProblem, actor; critic_samples = 1) where {S,A}
     # atomic unit of state evolution
     state = ctrl.propagator(sa.state, sa.action) # new_state
-    (action, E_actor, f, u) = ifelse(ctrl.terminal_condition(state), (sa.action, 0.0, 0.0, 0.0), 
+    (action, E_actor, f, u) = ifelse(ctrl.terminal_condition(state), 
+        (sa.action, 0.0, 0.0, 0.0), 
         choose_action(state, ctrl, actor))
     if isnan(E_actor)
         error("the E_actor is the first thing that goes bad")

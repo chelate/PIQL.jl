@@ -43,6 +43,13 @@ function init_tabular_actor_piql(ctrl; β = 1.0,
     return example_init_ta(example, update, mapping, ctrl.action_space, β)
 end
 
+function init_tabular_actor_q(ctrl; β = 1.0,
+    mapping = (state,action) -> (state,action), update = update_function_q(;burnin = 1, p = 2/3))
+    example = mapping(ctrl.initial_state(), first(ctrl.action_space))
+        # get type information about mapping result
+    return example_init_ta(example, update, mapping, ctrl.action_space, β)
+end
+
 
 function (ta::TabularActor)(state,action)
     key = ta.mapping(state,action)
@@ -81,9 +88,12 @@ function train!(ta::TabularActor, memory)
         key = ta.mapping(ee.state,ee.action)
         if haskey(ta.energy,key)
             ta.energy[key] += ta.update(ta.energy[key],ta.visits[key], ee.xi)
-            ta.visits[key] += 1
         else
             push!(ta.energy, key => ee.xi)
+        end
+        if haskey(ta.visits,key)
+            ta.visits[key] += 1
+        else
             push!(ta.visits, key => 1)
         end
     end

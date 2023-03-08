@@ -33,7 +33,7 @@ restarting PIQL hasn't been programmed in yet.
 """
 mutable struct PiqlParticle{S,A}
     worldline::Vector{StateAction{S,A}} # currently evolving state buffer
-    memory::Vector{EnergyEstimate{S,A}} # list of actively evolving nodes
+    memory::Vector{EnergyEstimate{S,A}} 
     time::Int # time since worline began (not time in state) for iteration purposes
     depth::Int # the target depth of PIQL back propagation for assessing bias/variance tradeoff
     function PiqlParticle(stateaction::StateAction{S,A}; depth = 1) where {S,A} 

@@ -29,7 +29,7 @@ function get_ideal_actor(ctrl, states; β = 1.0, maxiter = 1e5)
     while true
         iter +=1
         discr = update_actor_everywhere!(actor, ctrl, states)
-        if (discr < 1e-7) | (iter > maxiter) 
+        if (discr < 1e-9) | (iter > maxiter) 
             println.([discr,iter])
             break
         end
@@ -42,6 +42,20 @@ function jitter_actor(actor, jitter)
     newactor = deepcopy(actor)
     for key in keys(newactor.energy)
         newactor.energy[key] += randn() * jitter
+    end
+    return newactor
+end
+
+function jitter_actor(actor, ctrl, states; jitter = 1.0)
+    newactor = deepcopy(actor)
+    for s in states
+        state = collect(Tuple(s))
+        if !ctrl.terminal_condition(state)
+            for a in ctrl.action_space
+                key = newactor.mapping(state, a)
+                newactor.energy[key] += randn() * jitter
+            end
+        end
     end
     return newactor
 end
