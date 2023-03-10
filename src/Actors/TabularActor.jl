@@ -86,6 +86,7 @@ end
 function train!(ta::TabularActor, memory)
     # for ee in memory
     # we only use the final value to to fair training comparisons
+    if length(memory) > 0
     ee = memory[end]
         key = ta.mapping(ee.state,ee.action)
         #  update visits
@@ -102,6 +103,7 @@ function train!(ta::TabularActor, memory)
         end
     #end
     resize!(memory,0) # remove everything, it's been used
+    end
 end
 
 
