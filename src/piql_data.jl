@@ -56,12 +56,12 @@ function run_piql!(piql, ctrl, actor)
     # for depth = 1, you must still go at least one step,
     if ctrl.terminal_condition(sa.state)
         backpropagate_weights!(piql, ctrl)
-        # piql.worldline[1] = initial_state_action(ctrl, actor)
-        # if we restart piql, we need to y decide how that will work
+        piql.worldline[1] = initial_state_action(ctrl, actor)
+        # if we restart piql, we need to decide how that will work
         terminated = true
     elseif terminate_early
         backpropagate_weights!(piql, ctrl)
-        # piql.worldline[1] = sa # restart piql from last position
+        piql.worldline[1] = sa # restart piql from last position
         terminated = true
     else 
         piql.time += 1
@@ -90,9 +90,6 @@ function backpropagate_weights!(piql, ctrl)
         (ee, logz) = energy_estimate(sa0, sa1, logz, ctrl) # use the last logz
         # ee is a function of sa0 state acton pair
         push!(piql.memory, ee)
-    end
-    if piql.time != 1
-        error("didn't make it to the end")
     end
 end
 

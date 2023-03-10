@@ -1,4 +1,4 @@
-using Revise
+
 using PIQL
 using StatsBase
 
@@ -10,9 +10,42 @@ actor0 = get_ideal_actor(ctrl, states)
 actor_jittered = jitter_actor(actor0, ctrl, states; jitter =  0.5)
 actor_heated = get_ideal_actor(ctrl, states; β = 2.0)
 actor_heated.β = 1.0
-
 actor_cooled = get_ideal_actor(ctrl, states; β = 0.5)
 actor_cooled.β = 1.0
+
+
+
+### test that the true cost is really rcovered by the free energy
+# 
+# cost_dict = get_cost(ctrl, actor0, states)
+# free_dict = get_free_energy(ctrl, actor0, states)
+# for ii in states
+#     state = collect(Tuple(ii))
+#     if abs(cost_dict[state] - free_dict[state]) > 1e-10
+#         print("$state, $(cost_dict[state]), $(free_dict[state])")
+#     end
+# end
+# accurate almonst to machine ϵ
+
+c = excess_cost(ctrl, actor0, actor_heated, states)
+
+
+function training_curve(actor1, ctrl, actor0, states; epochs = 10^2)
+    actor = deepcopy(actor1)
+    piql = PIQL.random_piql(ctrl, actor; depth = 1, sa = start)
+    out = Float64[]
+    for ii in 1:epochs
+        training_epoch!(piql, ctrl, actor)
+        c = excess_cost(ctrl, actor0, actor, states)
+        push!(out,c)
+    end
+    return out, actor
+end
+
+training_result, new_actor = training_curve(actor_heated,ctrl,actor0,states)
+
+using UnicodePlots
+lineplot(training_result)
 
 function getstart(gw, actor1, ctrl)
     # finds a nice start location fairly far from the goal
@@ -133,7 +166,6 @@ function energy_estimate(start, actor0, actor1, ctrl; depth = 1)
 end
 
 
-piql = PIQL.random_piql(ctrl, actor_jittered; depth = 1, sa = start)
 
 
 eest = lst.E_critic - log(zlst(actor0,actor_jittered))/actor_jittered.β

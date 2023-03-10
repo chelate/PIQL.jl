@@ -4,7 +4,7 @@ export TabularActor, init_tabular_actor_piql, update_function_piql, update_funct
 mutable struct TabularActor{SA,F,G,A}
     energy::Dict{SA,Float64}
     visits::Dict{SA,Int}
-    update::F  # (olde, visits, new) -> newavg  pdates energies and visits according the the learning rule
+    update::F  # (olde, visits, new) -> newavg  updates energies and visits according the the learning rule
     mapping::G # mapping(state, action) -> . key reducing size  of space and enforcing boundaries 
     action_space::A # for scanning for fall back.
     # mapping(state,action) -> key
@@ -86,15 +86,17 @@ end
 function train!(ta::TabularActor, memory)
     for ee in memory
         key = ta.mapping(ee.state,ee.action)
-        if haskey(ta.energy,key)
-            ta.energy[key] += ta.update(ta.energy[key],ta.visits[key], ee.xi)
-        else
-            push!(ta.energy, key => ee.xi)
-        end
+        #  update visits
         if haskey(ta.visits,key)
             ta.visits[key] += 1
         else
             push!(ta.visits, key => 1)
+        end
+        # update energy
+        if haskey(ta.energy,key)
+            ta.energy[key] += ta.update(ta.energy[key],ta.visits[key], ee.xi)
+        else
+            push!(ta.energy, key => ee.xi)
         end
     end
     resize!(memory,0) # remove everything, it's been used
