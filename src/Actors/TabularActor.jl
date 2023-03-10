@@ -84,7 +84,9 @@ struct EnergyEstimate{S,A}
 end 
 """
 function train!(ta::TabularActor, memory)
-    for ee in memory
+    # for ee in memory
+    # we only use the final value to to fair training comparisons
+    ee = memory[end]
         key = ta.mapping(ee.state,ee.action)
         #  update visits
         if haskey(ta.visits,key)
@@ -98,6 +100,13 @@ function train!(ta::TabularActor, memory)
         else
             push!(ta.energy, key => ee.xi)
         end
-    end
+    #end
     resize!(memory,0) # remove everything, it's been used
 end
+
+
+##
+#
+# need to decide what the q learning rule is.
+#
+#

@@ -30,19 +30,21 @@ actor_cooled.β = 1.0
 c = excess_cost(ctrl, actor0, actor_heated, states)
 
 
-function training_curve(actor1, ctrl, actor0, states; epochs = 10^2)
+function training_curve(actor1, ctrl, actor0, states; epochs = 10^6)
     actor = deepcopy(actor1)
     piql = PIQL.random_piql(ctrl, actor; depth = 1, sa = start)
     out = Float64[]
     for ii in 1:epochs
         training_epoch!(piql, ctrl, actor)
-        c = excess_cost(ctrl, actor0, actor, states)
-        push!(out,c)
+        if  1 == mod(ii,10000) 
+            c = excess_cost(ctrl, actor0, actor, states)
+            push!(out,c)
+        end
     end
-    return out, actor
+    return out
 end
 
-training_result, new_actor = training_curve(actor_heated,ctrl,actor0,states)
+training_result = training_curve(actor_jittered,ctrl,actor0,states)
 
 using UnicodePlots
 lineplot(training_result)

@@ -50,6 +50,10 @@ function initial_piql(ctrl::ControlProblem, actor;
     return PiqlParticle(sa; depth)
 end
 
+"""
+Expected dynamics: grow the worldline until the terminal condition.
+then backpropogate weights and return terminated = true
+"""
 function run_piql!(piql, ctrl, actor)
     sa = piql.worldline[piql.time]
     terminate_early = (piql.time > piql.depth)
