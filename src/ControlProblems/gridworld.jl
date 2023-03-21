@@ -87,13 +87,13 @@ function make_gridworld(size; density = 0.1)
     return Gridworld(walls,goal)
 end
 
-function make_ctrl(gw::Gridworld; step_cost = 1, reward = -5, γ = 0.99)
+function make_ctrl(gw::Gridworld; step_cost = 1, reward = 5, γ = 0.99)
     dim = ndims(gw.walls)
     ControlProblem(
         step_choices(;dim),
         (s,a)->1.0,
         (s,a) -> take_step(s,a; dim, gw.walls),
-        (s0,a,s1) -> ifelse(s1 == gw.goal, reward, step_cost),
+        (s0,a,s1) -> ifelse(s1 == gw.goal, reward, - step_cost),
         s -> s == gw.goal ,
         () -> draw_not_wall(gw.walls),
         γ)

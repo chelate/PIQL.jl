@@ -1,7 +1,9 @@
 
+begin
+using Revise
 using PIQL
 using StatsBase
-
+end
 
 gw = make_gridworld([20,20]; density = 0.30);
 ctrl = make_ctrl(gw; γ = .9999);
@@ -13,7 +15,12 @@ actor_heated.β = 1.0
 actor_cooled = get_ideal_actor(ctrl, states; β = 0.5)
 actor_cooled.β = 1.0
 
-
+"""
+plans for piql meeting
+    - make training curves for heated cooled jittered
+    - make curves for PIQL and Q-learning
+    - start pendulum problem.
+"""
 
 ### test that the true cost is really rcovered by the free energy
 # 
@@ -27,17 +34,29 @@ actor_cooled.β = 1.0
 # end
 # accurate almonst to machine ϵ
 
-c = excess_cost(ctrl, actor0, actor_heated, states)
+c = excess_reward(ctrl, actor0, actor_heated, states)
 
+piql = PIQL.random_piql(ctrl, actor0; depth = 30)
 
-function training_curve(actor1, ctrl, actor0, states; epochs = 10^6)
+function getstart(gw, actor1, ctrl)
+    # finds a nice start location fairly far from the goal
+    start = PIQL.initial_state_action(ctrl,actor1)
+    while sum(abs.(start.state .- gw.goal)) < 10
+        start = PIQL.initial_state_action(ctrl,actor1)
+    end
+    return start
+end
+
+start = getstart(gw, actor0, ctrl)
+
+function training_curve(actor1, ctrl, actor0, states; epochs = 10^5)
     actor = deepcopy(actor1)
     piql = PIQL.random_piql(ctrl, actor; depth = 1, sa = start)
     out = Float64[]
     for ii in 1:epochs
         training_epoch!(piql, ctrl, actor)
         if  1 == mod(ii,10000) 
-            c = excess_cost(ctrl, actor0, actor, states)
+            c = excess_reward(ctrl, actor0, actor, states)
             push!(out,c)
         end
     end
@@ -49,15 +68,7 @@ training_result = training_curve(actor_jittered,ctrl,actor0,states)
 using UnicodePlots
 lineplot(training_result)
 
-function getstart(gw, actor1, ctrl)
-    # finds a nice start location fairly far from the goal
-    start = PIQL.initial_state_action(ctrl,actor1)
-    while sum(abs.(start.state .- gw.goal)) < 10
-        start = PIQL.initial_state_action(ctrl,actor1)
-    end
-    return start
-end
-start = getstart(gw, actor0, ctrl)
+
 
 function energy_est_truth(ctrl, actor0, actor1; 
     depth = 1, 
@@ -67,8 +78,8 @@ function energy_est_truth(ctrl, actor0, actor1;
         piql = PIQL.random_piql(ctrl, actor1; depth)
     end
     ee = last(piql.memory)
-    current_e = actor1(ee.state, ee.action)
-    (actor0(ee.state, ee.action) , ee.xi, current_e)
+    current_e = actor1(ee.sa0.state, ee.sa0.action)
+    (actor0(ee.sa0.state, ee.sa0.action) , PIQL.qbound(ee), current_e)
     # truth, est, current
 end
 
