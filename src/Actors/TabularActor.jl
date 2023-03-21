@@ -2,7 +2,7 @@ export TabularActor, init_tabular_actor_piql, update_function_piql, update_funct
 
 
 mutable struct TabularActor{SA,F,G,A}
-    energy::Dict{SA,Float64}
+    qtable::Dict{SA,Float64}
     visits::Dict{SA,Int}
     update::F  # (olde, visits, new) -> newavg  updates energies and visits according the the learning rule
     mapping::G # mapping(state, action) -> . key reducing size  of space and enforcing boundaries 
@@ -23,7 +23,7 @@ end
 function update_function_piql(;burnin = 1, p = 2/3, β = 1.0)
     function update(olde, visits, new)
         γ = (burnin / (burnin + visits))^p
-        return -log1p(γ * expm1(-β * (new - olde))) / β
+        return log1p(γ * expm1(β * (new - olde))) / β
         # using the piql update rule, linear in the exponent
     end 
     return update
@@ -31,7 +31,7 @@ end
 
 function example_init_ta(example_key::SA, update, mapping, action_space, β) where {SA}
     return TabularActor(
-        Dict{SA,Float64}(), # energy
+        Dict{SA,Float64}(), # qtable
         Dict{SA,Int}(),     # visits
         update, mapping, action_space, β)
 end
@@ -53,8 +53,8 @@ end
 
 function (ta::TabularActor)(state,action)
     key = ta.mapping(state,action)
-    if haskey(ta.energy,key)
-        return ta.energy[key]
+    if haskey(ta.qtable,key)
+        return ta.qtable[key]
     else # fall back to (rough) free energy
         # could probably be done in a more elegant way
         # fairly agressive exploration
@@ -62,12 +62,12 @@ function (ta::TabularActor)(state,action)
         nset = 0
         for a in ta.action_space
             key = ta.mapping(state,a)
-            if haskey(ta.energy,key)
-                out += exp(-ta.β * ta.energy[key])
+            if haskey(ta.qtable,key)
+                out += exp(ta.β * ta.qtable[key])
                 nset += 1
             end 
         end
-        return ifelse(nset ==0, 0.0, -log(out/nset) / ta.β)
+        return ifelse(nset ==0, 0.0, log(out/nset) / ta.β)
     end
 end
 
@@ -75,20 +75,19 @@ end
 Destructive memory training, storing partition function
 memory is composed of struct (at time of writing) consisting of
 
-struct EnergyEstimate{S,A}
-    state::S
-    action::A
-    β::Float64
-    xi::Float64 # energy fluctuation realization
-    logz::Float64
-end 
+    struct QEstimate{S,A}
+        sa::StateAction{S,A} # the state action information at this time step
+        criticq::Float64 # from the state one step forward in time
+        logz::Float64 # log z at state in sa.state
+    end 
+
 """
 function train!(ta::TabularActor, memory)
     # for ee in memory
     # we only use the final value to to fair training comparisons
     if length(memory) > 0
-    ee = memory[end]
-        key = ta.mapping(ee.state,ee.action)
+    qe = memory[end]
+        key = ta.mapping(qe.sa0.state, qe.sa0.action)
         #  update visits
         if haskey(ta.visits,key)
             ta.visits[key] += 1
@@ -96,10 +95,10 @@ function train!(ta::TabularActor, memory)
             push!(ta.visits, key => 1)
         end
         # update energy
-        if haskey(ta.energy,key)
-            ta.energy[key] += ta.update(ta.energy[key],ta.visits[key], ee.xi)
+        if haskey(ta.qtable,key)
+            ta.qtable[key] += ta.update(ta.qtable[key], ta.visits[key], qbound(qe))
         else
-            push!(ta.energy, key => ee.xi)
+            push!(ta.qtable, key => qbound(qe))
         end
     #end
     resize!(memory,0) # remove everything, it's been used

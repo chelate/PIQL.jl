@@ -2,43 +2,45 @@ using StatsBase: weights, Weights, sample # for Weights
 using StatsFuns: logsumexp
 export run_piql!, backpropagate_weights!, initial_piql, EnergyEstimate, training_epoch!
 
-struct EnergyEstimate{S,A}
-    state::S
-    action::A
-    β::Float64
-    xi::Float64 # energy fluctuation realization
-    logz::Float64 # previous log z
+struct QEstimate{S,A}
+    sa0::StateAction{S,A} # the state action information at this time step
+    sa1::StateAction{S,A} # the state action information at this time step
+    logz0::Float64 # log z at state in sa0.state
+    logz1::Float64 # log z at state in sa1.state
 end 
 
-"""
-for reference: current stateaction definition
-struct StateAction{S,A} # static and constructed on forward pass
-    state::S
-    action::A
-    β::Float64 # the beta under which the state was generated
-    E_actor::Float64 # the actor energy associated with the current state
-    E_critic::Float64 # the critic energy associated with the previous state
-    
-    # 
-    # diagnostics
-    #
 
-    cost::Float64 # actually incurred cost
-    f::Float64 # free energy of current action
-    u::Float64 # average energy of current action
+function qbound(qe::QEstimate)
+    # equivalent to log(ξ) / β from the paper
+    # this is the best estimate for the q function at qe.sa0 
+    # given the rest of the trajectory
+    qe.sa1.criticq + qe.logz1 / qe.sa1.β
 end
 
-currently assumption that energy is constant over run.
-restarting PIQL hasn't been programmed in yet.
+"""
+current StateAction definition:
+
+struct StateAction{S,A} # static and constructed on forward pass
+    # atomic unit of data for all reinforcement learning
+    # includes all information and diagnostics available from a single step.
+    state::S
+    action::A
+    β::Float64 # the beta under which the temperature is allowed to fluxuate
+    actorq::Float64
+    criticq::Float64
+    reward::Float64 # actually incurred cost entering the state
+    V::Float64 # free energy of current action (observed value)
+    U::Float64 # average energy of current action
+end
 """
 mutable struct PiqlParticle{S,A}
     worldline::Vector{StateAction{S,A}} # currently evolving state buffer
-    memory::Vector{EnergyEstimate{S,A}} 
+    memory::Vector{QEstimate{S,A}} 
     time::Int # time since worline began (not time in state) for iteration purposes
     depth::Int # the target depth of PIQL back propagation for assessing bias/variance tradeoff
     function PiqlParticle(stateaction::StateAction{S,A}; depth = 1) where {S,A} 
         worldline = [stateaction]
-        memory = EnergyEstimate{S,A}[]
+        memory = QEstimate{S,A}[]
         return new{S,A}(worldline, memory, 1, depth)
     end
 end
@@ -78,10 +80,16 @@ function run_piql!(piql, ctrl, actor)
     return terminated
 end
 
-function energy_estimate(sa0, sa1, logz, ctrl)
-    xi = sa1.E_critic - log1p(ctrl.γ * expm1(logz)) / sa1.β # not quite sure which β to use
-    new_logz = sa0.β*(sa0.E_actor - xi) # finish the recurrence relation
-    return (EnergyEstimate(sa0.state, sa0.action, sa1.β, xi, logz), new_logz)
+
+"""
+z(t) = exp(β(criticq - actorq)) (γ z(t+1) + (1-γ))
+z(t) = exp(β(criticq - actorq)) (γ (z(t+1)-1) + 1)
+logz(t) = β(criticq - actorq) +  log(γ*(z(t+1)-1) + 1)
+= β(criticq - actorq) +  logp1(γ*expm1(logz(t+1)))
+"""
+function qestimate(sa0, sa1, logz1, ctrl)
+    logz0 = sa0.β * (sa1.criticq - sa0.actorq) + log1p(ctrl.γ * expm1(logz1)) # not quite sure which β to use
+    return (QEstimate(sa0, sa1, logz0, logz1), logz0)
 end
 
 function backpropagate_weights!(piql, ctrl)
@@ -91,9 +99,9 @@ function backpropagate_weights!(piql, ctrl)
         sa1 = piql.worldline[piql.time]
         piql.time -= 1
         sa0 = piql.worldline[piql.time] # previous state
-        (ee, logz) = energy_estimate(sa0, sa1, logz, ctrl) # use the last logz
-        # ee is a function of sa0 state acton pair
-        push!(piql.memory, ee)
+        (qe, logz) = qestimate(sa0, sa1, logz, ctrl) # use the last logz
+        # qe is a function of sa0 state acton pair
+        push!(piql.memory, qe) # add to the end so that things are backward facing
     end
 end
 
