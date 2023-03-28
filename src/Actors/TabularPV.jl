@@ -43,17 +43,19 @@ function (pv::PVActor)(state, action)
 end
 
 function train!(pv::PVActor, memory)
-    for qe in memory
+    #for qe in memory
     # we only use the final value to to fair training comparisons
-    #if length(memory) > 0
-        #qe = memory[end]
+    if length(memory) > 0
+        qe = memory[end]
         train!(pv.value, qe)
         train!(pv.policy, qe)
-    end
-    l = length(memory)
-    resize!(memory,0) # remove everything, it's been used
-    return l
     #end
+    #l = length(memory)
+    resize!(memory,0) # remove everything, it's been used
+        return 1
+    else
+        return 0
+    end
 end
 # initialize
 function make_tabularpv(ta, ctrl, states; state_map = identity)
