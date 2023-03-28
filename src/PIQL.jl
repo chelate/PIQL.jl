@@ -6,6 +6,7 @@ include("ControlProblems/gridworld.jl")
 include("ControlProblems/grid_solver.jl")
 include("Actors/TabularActor.jl")
 include("Actors/EmptyActor.jl")
+include("Actors/TabularPV.jl")
 
 # Write your package code here.
 

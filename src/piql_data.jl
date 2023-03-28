@@ -10,12 +10,10 @@ struct QEstimate{S,A}
 end 
 
 
-function qbound(qe::QEstimate)
-    # equivalent to log(ξ) / β from the paper
-    # this is the best estimate for the q function at qe.sa0 
-    # given the rest of the trajectory
-    qe.sa1.criticq + qe.logz1 / qe.sa1.β
-end
+qbound(qe::QEstimate) = qe.logz0 / qe.sa1.β + qe.sa0.actorq # use z0 since we already have γ in
+vbound(qe::QEstimate) = qe.sa0.V + qe.logz0 / qe.sa0.β #
+ηbound(qe::QEstimate) = (qe.sa1.criticq - qe.sa0.V) * qe.sa0.β
+
 
 """
 current StateAction definition:
@@ -125,5 +123,5 @@ function training_epoch!(piql, ctrl, actor)
             break
         end
     end
-    train!(actor, piql.memory)
+    train!(actor, piql.memory) # return the number of updates performed
 end

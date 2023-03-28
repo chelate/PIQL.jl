@@ -27,6 +27,7 @@ struct StateAction{S,A} # static and constructed on forward pass
     reward::Float64 # actually incurred cost entering the state
     V::Float64 # free energy of current action (observed value)
     U::Float64 # average energy of current action
+    prior::Float64
 end
 
 
@@ -43,10 +44,10 @@ end
 
 
 function initial_action(state, ctrl::ControlProblem, actor)
-    (action, actorq, f, u) = choose_action(state, ctrl, actor) # new_action
+    (action, actorq, v, u, prior) = choose_action(state, ctrl, actor) # new_action
     cost = 0.0
     criticq = 0.0 # there was no prior state-action pair to be used here
-    return StateAction(state, action, actor.β, actorq, criticq, cost, f, u)
+    return StateAction(state, action, actor.β, actorq, criticq, cost, v, u, prior)
 end
 
 function criticq(state, action, ctrl, actor; critic_samples = 1)
@@ -66,18 +67,18 @@ end
 function new_state_action(sa::StateAction{S,A}, ctrl::ControlProblem, actor; critic_samples = 1) where {S,A}
     # atomic unit of state evolution
     state = ctrl.propagator(sa.state, sa.action) # new_state
-    (action, actorq, V, U) = ifelse(ctrl.terminal_condition(state), 
-        (sa.action, 0.0, 0.0, 0.0), 
+    (action, actorq, V, U, prior) = ifelse(ctrl.terminal_condition(state), 
+        (sa.action, 0.0, 0.0, 0.0, sa.prior), 
         choose_action(state, ctrl, actor))
     if isnan(actorq)
         error("the actorq is the first thing that goes bad")
     end
     critq = criticq(sa.state, sa.action, ctrl, actor; critic_samples)
-    cost = ctrl.reward_function(sa.state,sa.action,state)
+    cost = ctrl.reward_function(sa.state, sa.action, state)
     if isnan(critq)
         error("the criticq is the first thing that goes bad")
     end
-    return StateAction{S,A}(state, action, actor.β, actorq, critq, cost, V, U) # Let the compiler know that it is type invariant
+    return StateAction{S,A}(state, action, actor.β, actorq, critq, cost, V, U, prior) # Let the compiler know that it is type invariant
 end
 
 
@@ -92,7 +93,8 @@ function choose_action(state, ctrl, actor)
     V = log(z) / actor.β 
     U = sum(priors .* exp.(actor.β .* Q) .* Q) / z
     ii = sample( weights(priors .* exp.(actor.β .* Q)))
-    return (ctrl.action_space[ii], Q[ii] + Qmax, V + Qmax, U + Qmax)
+    prior = priors[ii]
+    return (ctrl.action_space[ii], Q[ii] + Qmax, V + Qmax, U + Qmax, prior)
 end
 
 
