@@ -49,6 +49,7 @@ mutable struct ChainActor{C,P,G,F,A}
     y::Vector{SampleContrast}
     # a special object which encodes the target
     ndims::Int # number of input dimensions
+    # usually 
 end
 
 function make_xy!(ca, batch)
@@ -56,7 +57,7 @@ function make_xy!(ca, batch)
     resize!(ca.x, ndims, length(batch))
     resize!(ca.y, length(batch))
     for (ii, sample) in enumerate(memory)
-        (;sa1,sa2,β) = sample
+        (;sa0, sa1, β) = sample
         ca.y[ii] = sample_contrast(sample)
         z1 = ca.prefun(vcat(sa1.state, sa1.action, β))
         z2 = ca.prefun(vcat(sa2.state, sa2.action, β))
