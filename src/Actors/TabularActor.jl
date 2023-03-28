@@ -83,10 +83,10 @@ memory is composed of struct (at time of writing) consisting of
 
 """
 function train!(ta::TabularActor, memory)
-    # for ee in memory
+    for qe in memory
     # we only use the final value to to fair training comparisons
-    if length(memory) > 0
-    qe = memory[end]
+    # if length(memory) > 0
+    # qe = memory[end]
         key = ta.mapping(qe.sa0.state, qe.sa0.action)
         #  update visits
         if haskey(ta.visits,key)
@@ -100,9 +100,11 @@ function train!(ta::TabularActor, memory)
         else
             push!(ta.qtable, key => qbound(qe))
         end
-    #end
-    resize!(memory,0) # remove everything, it's been used
     end
+    l = length(memory)
+    resize!(memory,0) # remove everything, it's been used
+    return l
+    #end
 end
 
 

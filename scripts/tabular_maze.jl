@@ -5,15 +5,32 @@ using PIQL
 using StatsBase
 end
 
+begin 
 gw = make_gridworld([20,20]; density = 0.30);
 ctrl = make_ctrl(gw; γ = .9999);
-states = state_iterator(gw)
-actor0 = get_ideal_actor(ctrl, states)
-actor_jittered = jitter_actor(actor0, ctrl, states; jitter =  0.5)
-actor_heated = get_ideal_actor(ctrl, states; β = 2.0)
-actor_heated.β = 1.0
-actor_cooled = get_ideal_actor(ctrl, states; β = 0.5)
-actor_cooled.β = 1.0
+states = state_iterator(gw);
+actor0 = get_ideal_actor(ctrl, states);
+actor_jittered = jitter_actor(actor0, ctrl, states; jitter =  0.5);
+actor_heated = get_ideal_actor(ctrl, states; β = 2.0);
+actor_heated.β = 1.0;
+actor_cooled = get_ideal_actor(ctrl, states; β = 0.5);
+actor_cooled.β = 1.0;
+end
+
+vectorstates = collect.(Tuple.(states))
+pv_jittered = make_tabularpv(actor_jittered, ctrl, vectorstates);
+pv_heated = make_tabularpv(actor_heated, ctrl, vectorstates);
+pv0 = make_tabularpv(actor0, ctrl, vectorstates);
+
+
+"""
+Below was an attempt to train free energy and Q function simultaneously.
+    
+    Unfortunately it turned out to be numerically unstable leading to enormously high logZ and nan-ing 
+"""
+# ta_jittered = tab_actor(actor_jittered)
+# ta_heated = tab_actor(actor_heated)
+# ta_cooled = tab_actor(actor_cooled)
 
 """
 plans for piql meeting
@@ -34,9 +51,7 @@ plans for piql meeting
 # end
 # accurate almonst to machine ϵ
 
-c = excess_reward(ctrl, actor0, actor_heated, states)
-
-piql = PIQL.random_piql(ctrl, actor0; depth = 30)
+c = excess_reward(ctrl, actor0, pv_jittered, states)
 
 function getstart(gw, actor1, ctrl)
     # finds a nice start location fairly far from the goal
@@ -49,13 +64,13 @@ end
 
 start = getstart(gw, actor0, ctrl)
 
-function training_curve(actor1, ctrl, actor0, states; epochs = 10^5)
+function training_curve(actor1, ctrl, actor0, states; epochs = 10^4)
     actor = deepcopy(actor1)
-    piql = PIQL.random_piql(ctrl, actor; depth = 1, sa = start)
+    piql = PIQL.random_piql(ctrl, actor; depth = 50, sa = start)
     out = Float64[]
     for ii in 1:epochs
         training_epoch!(piql, ctrl, actor)
-        if  1 == mod(ii,10000) 
+        if  1 == mod(ii,1000) 
             c = excess_reward(ctrl, actor0, actor, states)
             push!(out,c)
         end
@@ -63,7 +78,15 @@ function training_curve(actor1, ctrl, actor0, states; epochs = 10^5)
     return out
 end
 
-training_result = training_curve(actor_jittered,ctrl,actor0,states)
+piql = PIQL.random_piql(ctrl, actor0; depth = 30);
+
+for ii in 1:1000
+    training_epoch!(piql, ctrl, pv0)
+end
+
+c = excess_reward(ctrl, actor0, pv0, states)
+
+training_result = training_curve(actor_heated, ctrl, actor0, states)
 
 using UnicodePlots
 lineplot(training_result)
@@ -98,15 +121,15 @@ lineplot(log.(expvec(ctrl, actor0, actor_cooled)))
 For plotting the result, show the free energy as a function of state
 This might be helpful.
 """
-function free_energy_matrix(ctrl, actor, gw; max = 60.0)
+function free_energy_matrix(ctrl, actor, gw; min = -40.0)
     out = fill(NaN,size(gw.walls))
     states = state_iterator(gw)
     for ii in states
         state = collect(Tuple(ii))
-        out[ii] = PIQL.free_energy(state,ctrl,actor)
+        out[ii] = PIQL.value_function(state,ctrl,actor)
     end
-    out[out .> max] .= max
-    out[isnan.(out)] .= max
+    out[out .< min] .= min
+    out[isnan.(out)] .= min .* 1.1
     return out
 end
 
@@ -203,3 +226,7 @@ a .+= gw.walls
 heatmap(a)
 heatmap(free)
 heatmap(free1)
+
+
+free = free_energy_matrix(ctrl, actor0, gw)
+free1 = free_energy_matrix(ctrl, pv0, gw)
