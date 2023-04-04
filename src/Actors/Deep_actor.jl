@@ -17,13 +17,7 @@ function (a::Deep_actor)(state,action)
     return a.model(sa)[1]
 end
 
-function (a::Deep_actor)(v::Vector{})
-    println("im using the strange thing 2")
-    return a.model(v)[1]
-end
-
-
-function initilize_Deep_actor( model_parameters;lossfunction=Flux.Losses.mse,make_model=make_model_3H,lr=0.001)
+function initilize_Deep_actor( model_parameters; lossfunction=Flux.Losses.mse,make_model=make_model_3H, lr=0.001)
     function update(actor,gs)
         #ps= Flux.params(actor.model)
         ps=actor.trainparameters

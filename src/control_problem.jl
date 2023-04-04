@@ -21,12 +21,12 @@ struct StateAction{S,A} # static and constructed on forward pass
     # includes all information and diagnostics available from a single step.
     state::S
     action::A
-    β::Float64 # the beta under which the temperature is allowed to fluxuate
+    β::Float64 # the beta under which the action was chosen
     actorq::Float64
     criticq::Float64
     reward::Float64 # actually incurred cost entering the state
-    V::Float64 # free energy of current action (observed value)
-    U::Float64 # average energy of current action
+    V::Float64 # free energy of current state (observed value)
+    U::Float64 # average energy of current stte
     prior::Float64
 end
 
