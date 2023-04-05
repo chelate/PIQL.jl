@@ -16,20 +16,54 @@ struct ControlProblem{A, U, P, R, T, W}
     γ::Float64 # positive number less than one discount over time
 end
 
+struct ContrastPair{S,A}
+    state::S
+    action0::A
+    action1::A
+    eta0::Float64 # π exp(η)  = probably
+    eta1::Float64
+    criticq0::Float64
+    criticq1::Float64
+    ftrace::Float64 # Σ_i p_i (1 - p_i)
+end
+
 struct StateAction{S,A} # static and constructed on forward pass
     # atomic unit of data for all reinforcement learning
     # includes all information and diagnostics available from a single step.
     state::S
     action::A
-    β::Float64 # the beta under which the action was chosen
+    β::Float64 # the beta under which the action
     actorq::Float64
-    criticq::Float64
+    criticq::Float64 # initially 0, updated by actor at following time
     reward::Float64 # actually incurred cost entering the state
     V::Float64 # free energy of current state (observed value)
     U::Float64 # average energy of current stte
     prior::Float64
+    contrast::ContrastPair{S,A}
 end
 
+
+
+function make_contrast_pair(ctrl::ControlProblem, state, actor; critic_samples = 1)
+    priors = [ctrl.action_prior(state,a) for a in ctrl.action_space]
+    priors .*=  1 / sum(priors)
+    Q = [actor(state,a) for a in ctrl.action_space]
+    Q .-= maximum(Q)
+    probs = priors .* exp.(actor.β .* Q)
+    Z = sum(probs)
+    probs .*= 1 / Z
+    covars = probs .* (1 .- probs)
+    ftrace = sum(covars)
+    ii0 = sample(weights(covars))
+    ii1 = sample(weights(deleteat!(probs,ii1)))
+    a0 = ctrl.action_space[ii0]
+    a1 = ctrl.action_space[ii1]
+    eta0 = Q[ii0] - log(Z)/actor.β
+    eta1 = Q[ii1] - log(Z)/actor.β
+    criticq0 = criticq(state, a0, ctrl, actor; critic_samples)
+    criticq1 = criticq(state, a1, ctrl, actor; critic_samples)
+    ContrastPair(state, a0, a1, eta0, eta1, criticq0, criticq1, ftrace)
+end
 
 """
 Start off a trajectory with a new state action pair
@@ -43,11 +77,12 @@ function initial_state_action(ctrl::ControlProblem, actor)
 end
 
 
-function initial_action(state, ctrl::ControlProblem, actor)
+function initial_action(state, ctrl::ControlProblem, actor; critic_samples = 1)
     (action, actorq, v, u, prior) = choose_action(state, ctrl, actor) # new_action
     cost = 0.0
     criticq = 0.0 # there was no prior state-action pair to be used here
-    return StateAction(state, action, actor.β, actorq, criticq, cost, v, u, prior)
+    contrast_pair =  make_contrast_pair(ctrl, state, actor; critic_samples)
+    return StateAction(state, action, actor.β, actorq, criticq, cost, v, u, prior, contrast_pair)
 end
 
 function criticq(state, action, ctrl, actor; critic_samples = 1)
@@ -78,7 +113,8 @@ function new_state_action(sa::StateAction{S,A}, ctrl::ControlProblem, actor; cri
     if isnan(critq)
         error("the criticq is the first thing that goes bad")
     end
-    return StateAction{S,A}(state, action, actor.β, actorq, critq, cost, V, U, prior) # Let the compiler know that it is type invariant
+    contrast_pair =  make_contrast_pair(ctrl, state, actor; critic_samples)
+    return StateAction{S,A}(state, action, actor.β, actorq, critq, cost, V, U, prior, contrast_pair) # Let the compiler know that it is type invariant
 end
 
 

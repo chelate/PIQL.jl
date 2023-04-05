@@ -15,12 +15,17 @@ actor_heated = get_ideal_actor(ctrl, states; β = 2.0);
 actor_heated.β = 1.0;
 actor_cooled = get_ideal_actor(ctrl, states; β = 0.5);
 actor_cooled.β = 1.0;
+vectorstates = collect.(Tuple.(states))
 end
 
-vectorstates = collect.(Tuple.(states))
+excess_entropy(ctrl, actor0, actor_cooled, vectorstates)
+
+
 pv_jittered = make_tabularpv(actor_jittered, ctrl, vectorstates);
 pv_heated = make_tabularpv(actor_heated, ctrl, vectorstates);
 pv0 = make_tabularpv(actor0, ctrl, vectorstates);
+
+ pv_heated = make_contrastpv(actor_jittered, ctrl, vectorstates);
 
 
 """
