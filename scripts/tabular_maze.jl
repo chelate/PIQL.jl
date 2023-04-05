@@ -25,7 +25,7 @@ pv_jittered = make_tabularpv(actor_jittered, ctrl, vectorstates);
 pv_heated = make_tabularpv(actor_heated, ctrl, vectorstates);
 pv0 = make_tabularpv(actor0, ctrl, vectorstates);
 
- pv_heated = make_contrastpv(actor_jittered, ctrl, vectorstates);
+pv_heated = make_contrastpv(actor_heated, ctrl, vectorstates);
 
 
 """
