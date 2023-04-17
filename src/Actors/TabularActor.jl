@@ -1,4 +1,4 @@
-export TabularActor, init_tabular_actor_piql, update_function_piql, update_function_q, train!
+export TabularActor, init_tabular_actor_piql, update_function_piql, update_function_q, train!, tabularize
 
 
 mutable struct TabularActor{SA,F,G,A}
@@ -115,3 +115,13 @@ end
 # need to decide what the q learning rule is.
 #
 #
+
+function tabularize(ctrl, actor, states)
+    ta = init_tabular_actor_piql(ctrl)
+    for state in states
+        for action in ctrl.action_space
+            push!(ta.qtable,(state,action) => actor(state,action))
+        end
+    end
+    return ta
+end

@@ -18,14 +18,15 @@ actor_cooled.β = 1.0;
 vectorstates = collect.(Tuple.(states))
 end
 
-excess_entropy(ctrl, actor0, actor_cooled, vectorstates)
+# excess_entropy(ctrl, actor0, actor_cooled, vectorstates)
 
 
 pv_jittered = make_tabularpv(actor_jittered, ctrl, vectorstates);
 pv_heated = make_tabularpv(actor_heated, ctrl, vectorstates);
 pv0 = make_tabularpv(actor0, ctrl, vectorstates);
 
-pv_heated = make_contrastpv(actor_heated, ctrl, vectorstates);
+pv_cooled = make_tabularpv(actor_cooled, ctrl, vectorstates);
+cpv_cooled = make_contrastpv(actor_cooled, ctrl, vectorstates);
 
 
 """
@@ -69,9 +70,9 @@ end
 
 start = getstart(gw, actor0, ctrl)
 
-function training_curve(actor1, ctrl, actor0, states; epochs = 10^4)
+function training_curve(actor1, ctrl, actor0, states; epochs = 5*10^4, depth = 50)
     actor = deepcopy(actor1)
-    piql = PIQL.random_piql(ctrl, actor; depth = 50, sa = start)
+    piql = PIQL.random_piql(ctrl, actor; depth)
     out = Float64[]
     for ii in 1:epochs
         training_epoch!(piql, ctrl, actor)
@@ -83,18 +84,17 @@ function training_curve(actor1, ctrl, actor0, states; epochs = 10^4)
     return out
 end
 
-piql = PIQL.random_piql(ctrl, actor0; depth = 30);
-
-for ii in 1:1000
-    training_epoch!(piql, ctrl, pv0)
-end
-
-c = excess_reward(ctrl, actor0, pv0, states)
-
-training_result = training_curve(actor_heated, ctrl, actor0, states)
+training_result = training_curve(pv_heated, ctrl, actor0, states)
 
 using UnicodePlots
+
+training_result = training_curve(pv_cooled, ctrl, actor0, states)
 lineplot(training_result)
+training_result[end]
+
+training_result = training_curve(cpv_cooled, ctrl, actor0, states)
+lineplot(training_result)
+training_result[end]
 
 
 

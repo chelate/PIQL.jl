@@ -2,6 +2,7 @@ export make_contrastpv
 
 
 # This is the same as TabularPV only we change the type of TabularPolicy to dispatch on a a contrast trainer.
+# did not perform impressively
 
 
 function make_contrastpv(ta, ctrl, states; state_map = identity)
@@ -42,22 +43,20 @@ struct ContrastPair{S,A}
     action1::A
     eta0::Float64 # π exp(η)  = probably
     eta1::Float64
-    criticq0::Float64
-    criticq1::Float64
+    criticeta0::Float64
+    criticeta1::Float64
     ftrace::Float64 # Σ_i p_i (1 - p_i)
 end
 """
 
 function train!(tp::ContrastPolicy, qe)
-    (;state, action0, action1, eta0, eta1, criticq0, criticq1, ftrace) = qe.contrast
+    (;state, action0, action1, eta0, eta1, criticeta0, criticeta1, ftrace) = qe.sa0.contrast
     ptab = tp.ptable[state] # policy table
     ptab.visits[1] += 1 
     ii0 = tp.action_index(action0)
     ii1 = tp.action_index(action1)
-    H0 = ptab.wvec[ii0]
-    H1 = ptab.wvec[ii1]
-    importance_weight = ftrace * exp(H0 + H1 - (eta0 + eta1)) * tp.update(ptab.visits[1])
-    change = (eta0 -  criticq0 - (eta1 - criticq1)) * importance_weight
+    importance_weight = ftrace * exp( eta(ptab, ii0) + eta(ptab, ii1) - (eta0 + eta1)) * tp.update(ptab.visits[1]) / 4
+    change = (eta(ptab, ii0) -  criticeta0 - (eta(ptab, ii1) - criticeta1)) * importance_weight
     # if  eta0 is too large  this change will be positive and we will need to subtract it off.
     ptab.wvec[ii0] -= change 
     ptab.wvec[ii1] += change
@@ -67,7 +66,7 @@ end
 
 function make_contrastpolicy(ta::TabularActor, ctrl, states; state_map = identity)
     ptable = Dict(state => policy_table(state, ctrl, ta) for state in states)
-    update = learning_rate(;burnin = 1, p = 2/3)
+    update = learning_rate(;burnin = 1000, p = 2/3)
     actdict = Dict(a => i for (i,a) in enumerate(ctrl.action_space))
     ContrastPolicy(ptable, update, state_map, a->actdict[a])
 end

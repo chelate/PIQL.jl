@@ -16,14 +16,16 @@ struct ControlProblem{A, U, P, R, T, W}
     γ::Float64 # positive number less than one discount over time
 end
 
+
+# this was a dead end and needs to be removed (possibly).
 struct ContrastPair{S,A}
     state::S
     action0::A
     action1::A
     eta0::Float64 # π exp(η)  = probably
     eta1::Float64
-    criticq0::Float64
-    criticq1::Float64
+    criticeta0::Float64
+    criticeta1::Float64
     ftrace::Float64 # Σ_i p_i (1 - p_i)
 end
 
@@ -58,11 +60,11 @@ function make_contrast_pair(ctrl::ControlProblem, state, actor; critic_samples =
     ii1 = sample(weights(deleteat!(probs,ii0)))
     a0 = ctrl.action_space[ii0]
     a1 = ctrl.action_space[ii1]
-    eta0 = Q[ii0] - log(Z)/actor.β
-    eta1 = Q[ii1] - log(Z)/actor.β
-    criticq0 = criticq(state, a0, ctrl, actor; critic_samples)
-    criticq1 = criticq(state, a1, ctrl, actor; critic_samples)
-    ContrastPair(state, a0, a1, eta0, eta1, criticq0, criticq1, ftrace)
+    eta0 = actor.β * Q[ii0] - log(Z)
+    eta1 = actor.β * Q[ii1] - log(Z)
+    criticeta0 = actor.β * criticq(state, a0, ctrl, actor; critic_samples)
+    criticeta1 = actor.β * criticq(state, a1, ctrl, actor; critic_samples)
+    ContrastPair(state, a0, a1, eta0, eta1, criticeta0, criticeta1, ftrace)
 end
 
 """
@@ -113,7 +115,7 @@ function new_state_action(sa::StateAction{S,A}, ctrl::ControlProblem, actor; cri
     if isnan(critq)
         error("the criticq is the first thing that goes bad")
     end
-    contrast_pair =  make_contrast_pair(ctrl, state, actor; critic_samples)
+    contrast_pair = make_contrast_pair(ctrl, state, actor; critic_samples)
     return StateAction{S,A}(state, action, actor.β, actorq, critq, cost, V, U, prior, contrast_pair) # Let the compiler know that it is type invariant
 end
 
