@@ -2,6 +2,7 @@ export init_chainpv
 
 using SimpleChains
 using ElasticArrays
+using LogExpFunctions
 
 
 
@@ -43,10 +44,16 @@ end
 function calculate_loss(loss::CombinedDivLoss, logits)
     y = loss.targets
     total_loss = zero(eltype(logits))
+    logZZ = logsumexp(yy.logZ_t for yy in y) # normalizing constant for the Z
+    logZV = logsumexp( y[i].β*(logits[i,end] - y[i].V_t) for i in eachindex(y)) 
+    isnan(logZZ) && error("logZZ pooped first")
+    isnan(logZV) && error("logZV pooped first $(length(y))")
+    # normalizing constant for the value functions
     for i in eachindex(y)
         p_i = view(logits, :, i)
         y_i = y[i]
-        total_loss += combined_loss(p_i, y_i)
+        total_loss += combined_loss(p_i, y_i; logZZ, logZV)
+
     end
     total_loss
 end
@@ -61,11 +68,18 @@ function SimpleChains.chain_valgrad!(
     loss = getfield(layers, 1)
     total_loss = 0.0
     y = loss.targets
+    logZZ = logsumexp(yy.logZ_t for yy in y)
+    logZV = logsumexp( y[i].β*(previous_layer_output[i,end] - y[i].V_t) 
+        for i  in eachindex(y))
+    isnan(logZZ) && error("logZZ pooped first")
+    isnan(logZV) && error("logZV pooped first 
+        $(print(y)) 
+        $(print(previous_layer_output[:,end]))")
     # Store the backpropagated gradient in the previous_layer_output array.
     for i in eachindex(y)
         p_i = view(previous_layer_output, :, i)
         y_i = y[i]
-        total_loss += setgrad!(p_i, y_i)
+        total_loss += setgrad!(p_i, y_i; logZZ, logZV)
     end
     return total_loss, previous_layer_output, pu
 end
@@ -85,7 +99,7 @@ end
 front(itr, n=1) = Iterators.take(itr, length(itr)-n)
 # want to append value to the end of the policy vector
 
-function combined_loss(hvec, y::CombinedDivTarget)
+function combined_loss(hvec, y::CombinedDivTarget; logZZ = 0.0, logZV = 0.0)
     # the sum of policy and value losses
     # strict subset of computations of setgrad
     # hopefully never called
@@ -94,13 +108,15 @@ function combined_loss(hvec, y::CombinedDivTarget)
         criticeta,
         actioni, V_t, logZ_t, β) = y
     # value function
-    loss = exp(β * (V_t - v) + logZ_t) + β * v
+    loss = - exp(logZ_t - logZZ) * (hvec[end] - β*V_t - logZV)
     Z = sum(pivec[ii] * exp(p[ii]) for ii in front(eachindex(hvec)))
     change = - (criticeta - (hvec[actioni] - log(Z))) * exp(hvec[actioni] - eta_t) / Z
     return loss + change
 end
 
-function setgrad!(hvec, y::CombinedDivTarget)
+function setgrad!(hvec, y::CombinedDivTarget; logZZ = 0.0, logZV = 0.0)
+    # hvec is the previous layer_
+    # y is a specialized type that carries all neccesary gradient information
     # the sum of policy and value losses
     ( ;pivec, # prior vector (normalized)
         eta_t, # eta when the action was drawn
@@ -108,11 +124,13 @@ function setgrad!(hvec, y::CombinedDivTarget)
         actioni, V_t, logZ_t, β) = y
     # value function
     v = hvec[end]
-    loss = exp(β * V_t - v + logZ_t) + β * v
-    hvec[end] = - expm1(β * V_t - v + logZ_t) # value grad
+    loss = - exp(logZ_t - logZZ) * (v - β*V_t - logZV)
+    dv = exp(v - β*V_t - logZV) - exp(logZ_t - logZZ) 
+    hvec[end] = dv
     # policy function
     Z = sum(pivec[ii] * exp(hvec[ii]) for ii in front(eachindex(hvec)))
     change = - (criticeta - (hvec[actioni] - log(Z))) * exp(hvec[actioni] - eta_t) / Z
+    isnan(change) && error("change pooped first")
     for ii in front(eachindex(hvec))
         hvec[ii] = ((ii == actioni) - 
             (pivec[ii] * exp(hvec[ii]) / Z)) * change # policy grad
@@ -157,6 +175,8 @@ function (a::ChainPV)(state, action)
     πvec .*= inv(sum(πvec))
     ii = a.action_index[action]
     wvec = a.chain(a.prefun(state), a.params)
+    isnan(wvec[ii]) && error("state looks bad $(print(a.params))")
+    isnan(wvec[end]) && error("val looks bad $(print(a.params))")
     return (wvec[ii] - log(sum(πvec[i] * exp(wvec[i]) 
         for i in eachindex(πvec))) + wvec[end]) / a.β
 end

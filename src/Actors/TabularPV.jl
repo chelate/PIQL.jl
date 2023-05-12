@@ -97,6 +97,19 @@ end
 # Policy
 # returns η_i
 
+"""
+Our tabular policy consists of a policy table at each point in space
+The wvec are the unnormalized control vectors
+Visits modulates the quality of the 
+
+qbound(qe::QEstimate) = qe.logz0 / qe.sa1.β + qe.sa0.actorq 
+vbound(qe::QEstimate) = qe.sa0.V + qe.logz0 / qe.sa0.β #
+ηbound(qe::QEstimate) = (qe.sa1.criticq - qe.sa0.V) * qe.sa0.β
+
+There is currently no negative training component nor is there the proper
+entropy gradient descent.
+"""
+
 struct PolicyTable
     wvec::Vector{Float64} # log w_i/p_i
     prior::Vector{Float64} # assumed normalized
