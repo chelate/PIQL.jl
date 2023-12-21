@@ -41,6 +41,10 @@ function binary_bandit_problem(;rounds = 10, ncoins = 2, prior = (1,1), payoff =
         (h,t) = s.belief[a]
         f(update(s, a, false))*(t/(h+t)) + f(update(s, a, true))*(h/(h+t))
     end
+    function logpropagatorexp(s,a,f)
+        (h,t) = s.belief[a]
+        logaddexp(f(update(s, a, false))*(t/(h+t)),f(update(s, a, true))*(h/(h+t)))
+    end
     term(bs) = bs.rounds < 1
     initial_state() = BanditState([prior for ii in 1:ncoins],rounds)
     ControlProblem(
@@ -49,6 +53,7 @@ function binary_bandit_problem(;rounds = 10, ncoins = 2, prior = (1,1), payoff =
         propagator,
         reward,
         propagator_average,
+        logpropagatorexp,
         term, initial_state, γ)
 end
 

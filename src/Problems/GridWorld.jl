@@ -1,5 +1,5 @@
 
-export make_gridworld, make_ctrl
+export make_gridworld, gridworld_ctrl
 # struct ControlProblem{A, U, P, R, PA, T, W}
 #     action_space::Vector{A} # something that we can iterate over
 #     action_prior::U # π(s,a) -> Float64 exactly like energy
@@ -87,7 +87,7 @@ function make_gridworld(size; density = 0.1)
     return Gridworld(walls,goal)
 end
 
-function make_ctrl(gw::Gridworld; 
+function gridworld_ctrl(gw::Gridworld; 
     randomness = 0.1, # likelihood of choosing a random action
     reward_scale = 0.2, # temperature
     step_cost = 0.1*reward_scale, # entropic cost of a step
@@ -102,6 +102,11 @@ function make_ctrl(gw::Gridworld;
         end
         out 
     end
+    function log_pa(s,a,f) # propagator average
+        logsumexp(
+        log(((a == aa)*(1-randomness) + (randomness / len))) + f(take_step(s,aa; dim, walls)) 
+            for aa in step_choices(;dim))
+    end
     ControlProblem(
         step_choices(;dim),
         (s,a)->1.0 / len,
@@ -109,7 +114,7 @@ function make_ctrl(gw::Gridworld;
             ifelse(rand() < randomness, sample(step_choices(;dim)),a); 
             dim, walls),
         (s0,a,s1) -> ifelse(s1 == gw.goal, reward, - step_cost),
-        pa,
+        pa, log_pa,
         s -> s == gw.goal ,
         () -> draw_not_wall(gw.walls),
         γ) end
