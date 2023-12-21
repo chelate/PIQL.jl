@@ -6,11 +6,11 @@ using Colors
 
 
  
-s = (10,10)
+s = (8,8)
 gw = make_gridworld(s; density = 0.2)
 gwctrl = gridworld_ctrl(gw; randomness = 0.01, γ = 0.99, reward_scale = 1.0, reward = 2.0)
-weaker_gwctrl = modify(gwctrl, reward_function = (s,a,ss) -> 0.8*gwctrl.reward_function(s,a,ss) ) # softer control
-stronger_gwctrl = modify(gwctrl, reward_function = (s,a,ss) -> 1.2*gwctrl.reward_function(s,a,ss) ) # harder 
+weaker_gwctrl = modify(gwctrl, reward_function = (s,a,ss) -> 0.6*gwctrl.reward_function(s,a,ss) ) # softer control
+stronger_gwctrl = modify(gwctrl, reward_function = (s,a,ss) -> 1.4*gwctrl.reward_function(s,a,ss) ) # harder 
 
 ν = generate_ν(gwctrl)
 V_lo = generate_ν(weaker_gwctrl)
@@ -26,14 +26,20 @@ extrema(matrixify(ν))
 
 out = [begin
 V_lo0 = z_updateV(gwctrl, V_lo; β = exp(ii))
-minimum(matrixify(V_lo0) - matrixify(ν))
-end for ii in range(0,-5,20)]
+extrema(matrixify(V_lo0) - matrixify(ν))
+end for ii in range(0,-7,30)]
 
 out2 = [begin
-V_lo0 = logz_updateV(gwctrl, V_lo; β = exp(ii))
-minimum(matrixify(V_lo0) - matrixify(ν))
-end for ii in range(0,-5,20)]
+V_lo_up = logz_updateV(gwctrl, V_lo; β = exp(ii))
+extrema(matrixify(V_lo_up) - matrixify(ν))
+end for ii in range(0,-6,30)]
 
+begin
+f = Figure()
+ax = Axis(f[1,1], xlabel = "β", ylabel = "residual range")
+band!(ax,exp.(range(0,-6,30)),getindex.(out2,1), getindex.(out2,2))
+f
+end
 
 extrema(matrixify(V_hi0) - matrixify(ν))
 
