@@ -1,6 +1,6 @@
 module PIQL
 export ControlProblem, average_reward, modify
-export generate_ν, generate_z, generate_logz, z_updateV, logz_updateV # from value_iteration.jl
+export generate_ν, generate_z, generate_logz, z_updateV, logz_updateV, generate_optimality_gap# from value_iteration.jl
 import LogExpFunctions: logsumexp, logaddexp
 
 
@@ -64,13 +64,11 @@ end
 
 """
 the normalization for an unnormalized q function, function of state
+    needs to be stabilized
 """
 function Qnormalization(ctrl, Q, s)
-    z = 0.0
-    for a in ctrl.action_space
-        z += ctrl.action_prior(s,a)*exp(Q(s, a)) 
-    end
-    return log(z)
+    logsumexp(log(ctrl.action_prior(s,a)) + Q(s, a) 
+        for a in ctrl.action_space)
 end
 
 """
