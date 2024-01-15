@@ -28,7 +28,7 @@ function update_z!(Z, ctrl, V; β = 1.0)
         if ctrl.terminal_condition(s0)
             new = exp(0.0 - V(s0))
         else
-            new = z_recursion2(ctrl, 
+            new = z_recursion(ctrl, 
                 (s,a) -> controlV(ctrl, V, s, a), # V-determined Q-funciton
                     V, s0, Z; β)
         end

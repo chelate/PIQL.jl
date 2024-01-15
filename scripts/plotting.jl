@@ -1,56 +1,99 @@
 ##
 using CairoMakie
 using ColorSchemes
-using PIQL
 using Colors
+using JLD2
+using LaTeXStrings
+using Makie.GeometryBasics
 
-
-function learning_traj(gwctrl, v0; β = 1.0, n = 20)
-    out = [v0]
-    vnew = v0
-    for _ = 1:n
-        vnew = logz_updateV(gwctrl, vnew; β)
-        push!(out,vnew)
+function plot_experiment(exp_dict, furthest, trueval; noise = .1)
+    f = Figure()
+    ax = Axis(f[1,1], xlabel = L"iteration $i$: $V^{i+1} \rightarrow V^{i} + β^{-1}\log Z^{β}$", ylabel = L"residual: $V^i(s_0) - \nu(s_0)$", title = "noise = $noise")
+    trs(x) = sign(x)*abs(x)^(1/2)
+    prs = sort(collect(pairs(exp_dict)),by = x->-x[1])
+    l = length(prs) 
+    i = 0
+    for (β,d) in prs
+        out = map(x -> trs( x(furthest)- trueval(furthest)), d)[2:end]
+        lines!(ax,out; label = "β = $(round(β, digits = 3))",
+        color = ColorSchemes.roma[i/(length(prs)-1)],
+        linewidth = 2.0
+        )
+        i += 1
     end
-    return out
+    axislegend(ax)
+    f
 end
 
-begin
-s = (18,18)
-gw = make_gridworld(s; density = 0.2)
-end
- 
-
-function run_experiment(gw; randomness = 0.01, γ = .99, 
-    starting_temp = 0.1,
-    βrange = exp.(range(-6,0,8)))
-    #generates a named tuple
-    gwctrl = gridworld_ctrl(gw; randomness, γ)
-
-    weaker_gwctrl = modify(gwctrl, reward_function = (s,a,ss) -> starting_temp*gwctrl.reward_function(s,a,ss) )
-    
-    ν = generate_ν(gwctrl)
-    (_,furthest) = findmin(ν.dict)
-    V_lo = generate_ν(weaker_gwctrl)
-    experiment = Dict(β => learning_traj(gwctrl, V_lo; β, n = 5)    
-        for β in βrange)
-    optimality_gap = Dict(β => 
-            [generate_optimality_gap(gwctrl, v; ν) for v in vec]
-        for (β,vec) in pairs(experiment))
-
-    return (ν = ν, traj = experiment, gap = optimality_gap,
-        randomness = randomness, γ = γ, ctrl = gwctrl, s0 = furthest)
+function plot_optimality_gap(gap_dict, furthest, trueval; noise = .1)
+    f = Figure()
+    ax = Axis(f[1,1], xlabel = L"iteration $i$: $V^{i+1} \rightarrow V^{i} + β^{-1}\log Z^{β}$", ylabel = L"optimality gap: $R^i(s_0) - \nu(s_0)$", title = "noise = $noise", yscale = log10)
+    prs = sort(collect(pairs(gap_dict)),by = x->-x[1])
+    l = length(prs) 
+    i = 0
+    for (β,d) in prs
+        out = map(x ->  x(furthest), d)[2:end]
+        lines!(ax,out; label = "β = $(round(β, digits = 3))",
+        color = ColorSchemes.roma[i/(length(prs)-1)],
+        linewidth = 2.0
+        )
+        i += 1
+    end
+    axislegend(ax)
+    f
 end
 
-gap = generate_optimality_gap(out.ctrl, first(values(out.traj))[1])
-extrema(matrixify(gap))
-
-
-out = run_experiment(gw)
-
-let out = out
-    plot_experiment(out.traj, out.s0, out.ν; noise = out.randomness)
+function matrixify(g; filling = 0.0)
+    s = maximum(k for k in keys(g.dict))
+    m = fill(filling,Tuple(s) .+ 1)
+    for k in keys(g.dict)
+        m[k] = g(k)
+    end
+    return m
 end
+
+function matplot(x) 
+    m = matrixify(x; filling = NaN)
+    f = Figure()
+    ax = Axis(f[1,1], xlabel = L"x", ylabel = L"y", aspect = DataAspect())
+    ci = Tuple(argmin(matrixify(x; filling = Inf)))
+    cj = Tuple(argmax(matrixify(x; filling = -Inf)))
+    hm = heatmap!(ax,m, colormap = :roma, nan_color = RGB(.0))
+    poly!(Circle(Point2f(ci...), .2), color = RGB(.3,1.0,.3))
+    poly!(Circle(Point2f(cj...), .2), color = RGB(1.0,0.3,.3))
+    Colorbar(f[1, 2],hm, label = L"ν(s)")
+    f
+end
+
+# apply these plots to the saved data
+
+for file in readdir("data")
+    out = JLD2.load(joinpath("data",file))["out"]
+    name = split(file,".")[1]
+    fig = plot_experiment(out.traj, out.s0, out.ν; noise = out.randomness)
+    CairoMakie.save(joinpath("figures","experiment_$(name).pdf"),fig)
+end
+
+for file in readdir("data")
+    out = JLD2.load(joinpath("data",file))["out"]
+    name = split(file,".")[1]
+    fig = plot_optimality_gap(out.gap, out.s0, out.ν; noise = out.randomness)
+    CairoMakie.save(joinpath("figures","gap_$(name).pdf"),fig)
+end
+
+begin 
+    file = readdir("data")[1]
+    out = JLD2.load(joinpath("data",file))["out"]
+    fig = matplot(out.ν)
+    CairoMakie.save(joinpath("figures","gridworld.pdf"),fig)
+end
+
+
+
+
+
+
+
 
 let out = out
     plot_optimality_gap(out.gap, out.s0, out.ν; noise = out.randomness)
@@ -158,6 +201,27 @@ plot_experiment(experiment_hi,furthest,ν)
 
 
 
+
+function run_experiment(gw; randomness = 0.01, γ = .99, 
+    starting_temp = 0.1,
+    βrange = exp.(range(-6,0,8)))
+    #generates a named tuple
+    gwctrl = gridworld_ctrl(gw; randomness, γ)
+
+    weaker_gwctrl = modify(gwctrl, reward_function = (s,a,ss) -> starting_temp*gwctrl.reward_function(s,a,ss) )
+    
+    ν = generate_ν(gwctrl)
+    (_,furthest) = findmin(ν.dict)
+    V_lo = generate_ν(weaker_gwctrl)
+    experiment = Dict(β => learning_traj(gwctrl, V_lo; β, n = 5)    
+        for β in βrange)
+    optimality_gap = Dict(β => 
+            [generate_optimality_gap(gwctrl, v; ν) for v in vec]
+        for (β,vec) in pairs(experiment))
+
+    return (ν = ν, traj = experiment, gap = optimality_gap,
+        randomness = randomness, γ = γ, ctrl = gwctrl, s0 = furthest)
+end
 
 
 

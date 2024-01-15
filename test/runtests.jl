@@ -33,8 +33,12 @@ bbctrl = binary_bandit_problem(rounds = 20, ncoins = 2, prior = (1,1), payoff = 
     @test all( vlo_1(k) >= ν(k) - wiggle for k in keys(ν.dict))
     @test all( vhi_1(k) >= ν(k) - wiggle for k in keys(ν.dict))
     @test all( vlo_0(k) <= ν(k) + wiggle for k in keys(ν.dict))
-    # not sure why this one alone is failing
     @test all( vhi_0(k) <= ν(k) + wiggle for k in keys(ν.dict))
+
+    #test that the kl cost is always positive
+    @test 0 < kl_cost(gwctrl, gwctrl.initial_state(), (s,a) -> PIQL.controlV(gwctrl, V_lo, s, a)) 
+    @test 0 < kl_cost(gwctrl, gwctrl.initial_state(), (s,a) -> PIQL.controlV(gwctrl, V_hi, s, a))
+
     # gridworld + tabular solver
 
     i0 = bbctrl.initial_state()

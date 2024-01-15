@@ -1,7 +1,8 @@
 module PIQL
 export ControlProblem, average_reward, modify
 export generate_ν, generate_z, generate_logz, z_updateV, logz_updateV, generate_optimality_gap# from value_iteration.jl
-import LogExpFunctions: logsumexp, logaddexp
+export kl_cost # from path_functions.jl
+import LogExpFunctions: logsumexp, logaddexp, xlogx, xlogy
 
 
 """
@@ -20,8 +21,10 @@ struct ControlProblem{AA, U, P, R, PA, PE, T, W}
     initial_state::W # W() -> x0 generates inital states of interest
     γ::Float64 # positive number less than one discount over time
 end
-# Write your package code here.
 
+"""
+probably should be replaced with setfield or similar
+"""
 function modify(ctrl;
     action_space = ctrl.action_space,
     action_prior = ctrl.action_prior,
@@ -99,21 +102,11 @@ end
 
 """
 this is used to detemrine Z
+not numerically stable enough
 """
+
+
 function z_recursion(ctrl, Q, V, s, Z; β= 1.0)
-    out = 0.0
-    for a in ctrl.action_space
-        out += action_probability(ctrl, Q, s, a) * exp(β * fitness(ctrl, V, Q, s, a) ) * (ctrl.γ * ctrl.propagator_average(s, a, Z) + 1 - ctrl.γ)
-    end
-    return out
-end    
-
-"""
-probably not numerically stable enough
-"""
-
-
-function z_recursion2(ctrl, Q, V, s, Z; β= 1.0)
     out = 0.0
     for a in ctrl.action_space
         out += ctrl.action_prior(s,a) * exp(β * controlV(ctrl, V, s, a) + (1-β) * controlQ(ctrl,Q,s,a)) * (ctrl.γ * ctrl.propagator_average(s, a, Z) + 1 - ctrl.γ)
@@ -122,17 +115,10 @@ function z_recursion2(ctrl, Q, V, s, Z; β= 1.0)
 end
 
 
-function z_recursion3(ctrl, Q, V, s, Z; β= 1.0)
-    out = logsumexp(
-    log(ctrl.action_prior(s,a)) + β * controlV(ctrl, V, s, a) + (1-β) * controlQ(ctrl,Q,s,a) + log(ctrl.γ * ctrl.propagator_average(s, a, Z) + 1 - ctrl.γ)
-        for a in ctrl.action_space)
-    return exp(out)
-end   
-
 
 """
+derivation
 =   log(ctrl.γ * ctrl.propagator_average(s, a, Z) + 1 - ctrl.γ)
-=   log( 1 + ctrl.γ/(1-ctrl.γ) + log(ctrl.propagator_average(s, a, Z))) + log(1 - ctrl.γ)
 =   logaddexp( log(ctrl.γ) + ctrl.logpropagator_exp(s, a, logz)) , log(1 - ctrl.γ))
 """
 
@@ -145,6 +131,7 @@ end
 
 
 include("value_iteration.jl")
+include("path_functions.jl")
 include("Problems/BinaryBandit.jl")
 include("Problems/GridWorld.jl")
 
